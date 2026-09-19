@@ -1,229 +1,32 @@
 "use client";
-
-import {useCallback, useEffect, useState} from "react";
+import {useCallback,useEffect,useState} from "react";
 import dynamic from "next/dynamic";
-
-const RouteMap = dynamic(() => import("./RouteMap"), {
-  ssr: false,
-  loading: () => <div className="map loading">Loading live map…</div>
-});
-
-const time = (value: any) => {
-  if (!value) return "—";
-  const match = String(value).match(/T(\d{2}:\d{2})/);
-  return match?.[1] || "—";
-};
-
-const date = (value: any) => {
-  if (!value) return "";
-  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
-  if (!match) return "";
-  return new Date(match[1] + "T12:00:00").toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short"
-  });
-};
-
-const num = (value: any, suffix = "") =>
-  value == null ? null : `${Math.round(Number(value)).toLocaleString()}${suffix}`;
-
-export default function Flightline() {
-  const [flight, setFlight] = useState<any>(null);
-  const [flightNumber, setFlightNumber] = useState("FR4776");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [auto, setAuto] = useState(true);
-  const [last, setLast] = useState("");
-
-  const refresh = useCallback(async (requestedFlight?: string) => {
-    const code = (requestedFlight || flightNumber).trim().toUpperCase();
-    if (!code) return;
-
-    setLoading(true);
-    setErr("");
-
-    try {
-      const r = await fetch(`/api/flight-status?flight=${encodeURIComponent(code)}`, {
-        cache: "no-store"
-      });
-      const j = await r.json();
-
-      if (!r.ok) throw Error(j.error || "Unable to load flight");
-
-      setFlight(j.flight);
-      setFlightNumber(j.flight?.flight?.iata || j.flight?.flight?.icao || code);
-      setLast(new Date(j.fetchedAt).toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      }));
-    } catch (e) {
-      setFlight(null);
-      setErr(e instanceof Error ? e.message : "Unable to load flight");
-    } finally {
-      setLoading(false);
-    }
-  }, [flightNumber]);
-
-  useEffect(() => {
-    refresh("FR4776");
-  }, []);
-
-  useEffect(() => {
-    if (!auto || !flight) return;
-    const id = setInterval(() => refresh(), 60000);
-    return () => clearInterval(id);
-  }, [auto, flight, refresh]);
-
-  const live = flight?.live;
-  const departure = flight?.departure;
-  const arrival = flight?.arrival;
-  const status = flight?.flight_status || "scheduled";
-  const isLive = live?.latitude != null && live?.longitude != null;
-
-  const statusText =
-    status === "active" ? "In flight" :
-    status === "landed" ? "Landed" :
-    status === "cancelled" ? "Cancelled" :
-    status === "incident" ? "Incident" :
-    Number(departure?.delay || 0) > 0 ? "Delayed" :
-    "On time";
-
-  const departureTime = departure?.actual || departure?.estimated || departure?.scheduled;
-  const arrivalTime = arrival?.actual || arrival?.estimated || arrival?.scheduled;
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    refresh();
-  };
-
-  return (
-    <main className="shell">
-      <header className="nav">
-        <div>
-          <div className="ey">FLIGHTLINE · LIVE TRACKING</div>
-          <h1>{flight?.flight?.iata || flightNumber || "Flightline"}</h1>
-        </div>
-        <div className={`pill ${statusText === "Delayed" || statusText === "Cancelled" ? "warn" : statusText === "In flight" ? "blue" : "ok"}`}>
-          <i /> {statusText}
-        </div>
-      </header>
-
-      <form className="search" onSubmit={submit}>
-        <input
-          value={flightNumber}
-          onChange={(e) => setFlightNumber(e.target.value.toUpperCase())}
-          placeholder="Flight number e.g. FR4776"
-          aria-label="Flight number"
-          autoCapitalize="characters"
-          spellCheck={false}
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Searching…" : "Search flight"}
-        </button>
-      </form>
-
-      {flight && (
-        <>
-          <section className="card route">
-            <div>
-              <b>{departure?.iata || "—"}</b>
-              <span>{departure?.airport || "Departure airport"}</span>
-              {departureTime && <small>{date(departureTime)} · {time(departureTime)}</small>}
-            </div>
-            <div className="arrow">✈</div>
-            <div className="right">
-              <b>{arrival?.iata || "—"}</b>
-              <span>{arrival?.airport || "Arrival airport"}</span>
-              {arrivalTime && <small>{date(arrivalTime)} · {time(arrivalTime)}</small>}
-            </div>
-          </section>
-
-          <section className="card">
-            <RouteMap live={live} departure={departure} arrival={arrival} />
-            <div className="mapfoot">
-              <div>
-                <small>POSITION</small>
-                {isLive && (
-                  <strong>{Number(live.latitude).toFixed(4)}, {Number(live.longitude).toFixed(4)}</strong>
-                )}
-              </div>
-              {last && (
-                <div className="right">
-                  <small>API UPDATED</small>
-                  <strong>{last}</strong>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="grid">
-            {departureTime && (
-              <div className="stat">
-                <small>DEPARTURE</small>
-                <strong>{time(departureTime)}</strong>
-                <em>
-                  {departure?.actual ? "Actual" :
-                    departure?.estimated ? "Estimated" :
-                    departure?.delay != null ? `${departure.delay} min delay` : "Scheduled"}
-                </em>
-              </div>
-            )}
-            {arrivalTime && (
-              <div className="stat">
-                <small>ARRIVAL</small>
-                <strong>{time(arrivalTime)}</strong>
-                <em>
-                  {arrival?.actual ? "Actual" :
-                    arrival?.estimated ? "Estimated" :
-                    arrival?.delay != null ? `${arrival.delay} min delay` : "Scheduled"}
-                </em>
-              </div>
-            )}
-            {isLive && live.altitude != null && (
-              <div className="stat">
-                <small>ALTITUDE</small>
-                <strong>{num(live.altitude, " ft")}</strong>
-              </div>
-            )}
-            {isLive && live.speed_horizontal != null && (
-              <div className="stat">
-                <small>SPEED</small>
-                <strong>{num(live.speed_horizontal, " km/h")}</strong>
-              </div>
-            )}
-          </section>
-
-          {(flight?.airline?.name || flight?.aircraft?.iata || flight?.aircraft?.icao ||
-            flight?.aircraft?.registration || departure?.gate || departure?.terminal ||
-            arrival?.gate || arrival?.terminal) && (
-            <section className="card details">
-              <h2>Flight details</h2>
-              <div className="detailsgrid">
-                {flight?.airline?.name && <div><small>AIRLINE</small><strong>{flight.airline.name}</strong></div>}
-                {(flight?.aircraft?.iata || flight?.aircraft?.icao) && <div><small>AIRCRAFT</small><strong>{flight.aircraft.iata || flight.aircraft.icao}</strong></div>}
-                {flight?.aircraft?.registration && <div><small>REGISTRATION</small><strong>{flight.aircraft.registration}</strong></div>}
-                {departure?.gate && <div><small>DEPARTURE GATE</small><strong>{departure.gate}</strong></div>}
-                {departure?.terminal && <div><small>DEPARTURE TERMINAL</small><strong>{departure.terminal}</strong></div>}
-                {arrival?.gate && <div><small>ARRIVAL GATE</small><strong>{arrival.gate}</strong></div>}
-                {arrival?.terminal && <div><small>ARRIVAL TERMINAL</small><strong>{arrival.terminal}</strong></div>}
-              </div>
-            </section>
-          )}
-
-          <div className="actions">
-            <button onClick={() => refresh()} disabled={loading}>
-              {loading ? "Refreshing…" : "↻ Refresh now"}
-            </button>
-            <button className={auto ? "active" : ""} onClick={() => setAuto((v) => !v)}>
-              {auto ? "● Auto-refresh 60s" : "○ Auto-refresh off"}
-            </button>
-          </div>
-        </>
-      )}
-
-      {err && <div className="error">{err}</div>}
-      <footer>Live data via Aviationstack · Server-side API proxy{last ? ` · Last update ${last}` : ""}</footer>
-    </main>
-  );
+const RouteMap=dynamic(()=>import("./RouteMap"),{ssr:false,loading:()=> <div className="map loading">Loading live map…</div>});
+const time=(v:any)=>{if(!v)return null;const s=String(v);return s.match(/T(\d{2}:\d{2})/)?.[1]||s.match(/(?:^|\s)(\d{2}:\d{2})/)?.[1]||null};
+const date=(v:any)=>{if(!v)return "";const m=String(v).match(/^(\d{4}-\d{2}-\d{2})/);return m?new Date(m[1]+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"}):""};
+const num=(v:any,s="")=>v==null?null:Math.round(Number(v)).toLocaleString()+s;
+function ThemeToggle(){const[dark,setDark]=useState(false);useEffect(()=>{const s=localStorage.getItem("flightline-theme");const d=s?s==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.dataset.theme=s||"system";setDark(d)},[]);const toggle=()=>{const d=!dark;setDark(d);localStorage.setItem("flightline-theme",d?"dark":"light");document.documentElement.dataset.theme=d?"dark":"light"};return <button className="themeToggle" onClick={toggle} aria-label="Toggle colour mode"><span>{dark?"☾":"☀︎"}</span></button>}
+export default function Flightline(){
+ const[flight,setFlight]=useState<any>(null),[flightNumber,setFlightNumber]=useState(""),[err,setErr]=useState(""),[loading,setLoading]=useState(false),[auto,setAuto]=useState(true),[last,setLast]=useState("");
+ const refresh=useCallback(async(requested?:string)=>{const code=(requested??flightNumber).trim().toUpperCase();if(!code)return;setLoading(true);setErr("");try{const r=await fetch("/api/flight-status?flight="+encodeURIComponent(code),{cache:"no-store"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to load flight");setFlight(j.flight);setFlightNumber(j.flight?.flight?.iata||j.flight?.flight?.icao||code);setLast(new Date(j.fetchedAt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"}))}catch(e){setFlight(null);setErr(e instanceof Error?e.message:"Unable to load flight")}finally{setLoading(false)}},[flightNumber]);
+ useEffect(()=>{if(!auto||!flight)return;const id=setInterval(()=>refresh(),60000);return()=>clearInterval(id)},[auto,flight,refresh]);
+ const live=flight?.live,departure=flight?.departure,arrival=flight?.arrival,status=flight?.flight_status||"scheduled",isLive=live?.latitude!=null&&live?.longitude!=null;
+ const statusText=status==="active"||status==="en-route"?"In flight":status==="landed"?"Landed":status==="cancelled"?"Cancelled":status==="incident"?"Incident":Number(departure?.delay||0)>0?"Delayed":"Scheduled";
+ const departureTime=departure?.actual||departure?.estimated||departure?.scheduled,arrivalTime=arrival?.actual||arrival?.estimated||arrival?.scheduled;
+ const submit=(e:React.FormEvent)=>{e.preventDefault();refresh()};
+ return <main className="shell">
+  <header className="topbar"><div className="brand"><div className="brandmark">✦</div><div><div className="brandname">Flightline</div><div className="ey">LIVE FLIGHT TRACKING</div></div></div><ThemeToggle/></header>
+  {!flight&&!loading&&!err&&<section className="hero"><div className="heroEyebrow">FLIGHT TRACKER</div><h1>Where is your flight?</h1><p>Search any flight number and see its route, live position, timings and operational details.</p><form className="heroSearch" onSubmit={submit}><span>⌕</span><input value={flightNumber} onChange={e=>setFlightNumber(e.target.value.toUpperCase())} placeholder="Enter flight number" aria-label="Flight number" autoCapitalize="characters" spellCheck={false} autoFocus/><button type="submit" disabled={!flightNumber.trim()||loading}>Track</button></form><div className="examples"><span>Try a flight</span><button type="button" onClick={()=>{setFlightNumber("BA117");refresh("BA117")}}>BA117</button><button type="button" onClick={()=>{setFlightNumber("EK5");refresh("EK5")}}>EK5</button><button type="button" onClick={()=>{setFlightNumber("FR4776");refresh("FR4776")}}>FR4776</button></div></section>}
+  {loading&&!flight&&<div className="loadingCard">Finding your flight…</div>}
+  {flight&&<>
+   <header className="flightHeader"><div><div className="ey">FLIGHT</div><h1>{flight.flight?.iata||flightNumber}</h1><div className="subline">{flight.airline?.name||"Flight"} · {departure?.iata||"—"} → {arrival?.iata||"—"}</div></div><div className={"pill "+(statusText==="Delayed"||statusText==="Cancelled"?"warn":statusText==="In flight"?"blue":"ok")}><i/> {statusText}</div></header>
+   <form className="search compactSearch" onSubmit={submit}><input value={flightNumber} onChange={e=>setFlightNumber(e.target.value.toUpperCase())} placeholder="Flight number" aria-label="Flight number"/><button type="submit" disabled={loading}>{loading?"Searching…":"Track"}</button></form>
+   <section className="card route"><div><b>{departure?.iata||"—"}</b><span>{departure?.airport||"Departure"}</span>{departureTime&&<small>{date(departureTime)} · {time(departureTime)}</small>}</div><div className="arrow">✈</div><div className="right"><b>{arrival?.iata||"—"}</b><span>{arrival?.airport||"Arrival"}</span>{arrivalTime&&<small>{date(arrivalTime)} · {time(arrivalTime)}</small>}</div></section>
+   <section className="card mapCard"><RouteMap live={live} departure={departure} arrival={arrival}/><div className="mapfoot"><div><small>POSITION</small><strong>{isLive?Number(live.latitude).toFixed(4)+", "+Number(live.longitude).toFixed(4):"Position unavailable"}</strong></div><div className="right"><small>DATA SOURCE</small><strong>AirLabs · {last||"—"}</strong></div></div></section>
+   <section className="grid">{departureTime&&<div className="stat"><small>DEPARTURE</small><strong>{time(departureTime)}</strong><em>{departure?.actual?"Actual":departure?.estimated?"Estimated":departure?.delay!=null?departure.delay+" min delay":"Scheduled"}</em></div>}{arrivalTime&&<div className="stat"><small>ARRIVAL</small><strong>{time(arrivalTime)}</strong><em>{arrival?.actual?"Actual":arrival?.estimated?"Estimated":arrival?.delay!=null?arrival.delay+" min delay":"Scheduled"}</em></div>}{isLive&&live.altitude!=null&&<div className="stat"><small>ALTITUDE</small><strong>{num(live.altitude," m")}</strong></div>}{isLive&&live.speed_horizontal!=null&&<div className="stat"><small>SPEED</small><strong>{num(live.speed_horizontal," km/h")}</strong></div>}</section>
+   {(flight.airline?.name||flight.aircraft?.iata||flight.aircraft?.icao||flight.aircraft?.registration||departure?.gate||departure?.terminal||arrival?.gate||arrival?.terminal)&&<section className="card details"><h2>Flight details</h2><div className="detailsgrid">{flight.airline?.name&&<div><small>AIRLINE</small><strong>{flight.airline.name}</strong></div>}{(flight.aircraft?.iata||flight.aircraft?.icao)&&<div><small>AIRCRAFT</small><strong>{flight.aircraft.iata||flight.aircraft.icao}</strong></div>}{flight.aircraft?.registration&&<div><small>REGISTRATION</small><strong>{flight.aircraft.registration}</strong></div>}{departure?.gate&&<div><small>DEPARTURE GATE</small><strong>{departure.gate}</strong></div>}{departure?.terminal&&<div><small>DEPARTURE TERMINAL</small><strong>{departure.terminal}</strong></div>}{arrival?.gate&&<div><small>ARRIVAL GATE</small><strong>{arrival.gate}</strong></div>}{arrival?.terminal&&<div><small>ARRIVAL TERMINAL</small><strong>{arrival.terminal}</strong></div>}</div></section>}
+   <div className="actions"><button onClick={()=>refresh()} disabled={loading}>{loading?"Refreshing…":"↻ Refresh now"}</button><button className={auto?"active":""} onClick={()=>setAuto(v=>!v)}>{auto?"● Auto-refresh 60s":"○ Auto-refresh off"}</button><button onClick={()=>{setFlight(null);setErr("");setFlightNumber("")}}>New search</button></div>
+  </>}
+  {err&&<div className="error">{err}</div>}<footer>Live aviation data via AirLabs · Your API key stays server-side</footer>
+ </main>
 }
