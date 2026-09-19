@@ -47,7 +47,7 @@ function toTimestamp(value:any, timezone?:string) {
   return guess - (asUtc - guess);
 }
 
-function simulatePosition(departure:any, arrival:any) {
+function simulatePosition(departure:any, arrival:any, now=Date.now()) {
   const depLat=Number(departure?.latitude), depLon=Number(departure?.longitude);
   const arrLat=Number(arrival?.latitude), arrLon=Number(arrival?.longitude);
   if (![depLat,depLon,arrLat,arrLon].every(Number.isFinite)) return null;
