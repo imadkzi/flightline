@@ -25,7 +25,7 @@ const date = (value: any) => {
 };
 
 const num = (value: any, suffix = "") =>
-  value == null ? "—" : `${Math.round(Number(value)).toLocaleString()}${suffix}`;
+  value == null ? null : `${Math.round(Number(value)).toLocaleString()}${suffix}`;
 
 export default function Flightline() {
   const [flight, setFlight] = useState<any>(null);
@@ -129,13 +129,13 @@ export default function Flightline() {
             <div>
               <b>{departure?.iata || "—"}</b>
               <span>{departure?.airport || "Departure airport"}</span>
-              <small>{date(departureTime)} · {time(departureTime)}</small>
+              {departureTime && <small>{date(departureTime)} · {time(departureTime)}</small>}
             </div>
             <div className="arrow">✈</div>
             <div className="right">
               <b>{arrival?.iata || "—"}</b>
               <span>{arrival?.airport || "Arrival airport"}</span>
-              <small>{date(arrivalTime)} · {time(arrivalTime)}</small>
+              {arrivalTime && <small>{date(arrivalTime)} · {time(arrivalTime)}</small>}
             </div>
           </section>
 
@@ -144,61 +144,72 @@ export default function Flightline() {
             <div className="mapfoot">
               <div>
                 <small>POSITION</small>
-                <strong>
-                  {isLive
-                    ? `${Number(live.latitude).toFixed(4)}, ${Number(live.longitude).toFixed(4)}`
-                    : "Not airborne"}
-                </strong>
+                {isLive && (
+                  <strong>{Number(live.latitude).toFixed(4)}, {Number(live.longitude).toFixed(4)}</strong>
+                )}
               </div>
-              <div className="right">
-                <small>API UPDATED</small>
-                <strong>{last || "—"}</strong>
-              </div>
+              {last && (
+                <div className="right">
+                  <small>API UPDATED</small>
+                  <strong>{last}</strong>
+                </div>
+              )}
             </div>
           </section>
 
           <section className="grid">
-            <div className="stat">
-              <small>DEPARTURE</small>
-              <strong>{time(departureTime)}</strong>
-              <em>
-                {departure?.actual ? "Actual" :
-                  departure?.estimated ? "Estimated" :
-                  departure?.delay ? `${departure.delay} min delay` : "Scheduled"}
-              </em>
-            </div>
-            <div className="stat">
-              <small>ARRIVAL</small>
-              <strong>{time(arrivalTime)}</strong>
-              <em>
-                {arrival?.actual ? "Actual" :
-                  arrival?.estimated ? "Estimated" :
-                  arrival?.delay ? `${arrival.delay} min delay` : "Scheduled"}
-              </em>
-            </div>
-            <div className="stat">
-              <small>ALTITUDE</small>
-              <strong>{isLive ? num(live.altitude, " ft") : "—"}</strong>
-            </div>
-            <div className="stat">
-              <small>SPEED</small>
-              <strong>{isLive ? num(live.speed_horizontal, " km/h") : "—"}</strong>
-            </div>
+            {departureTime && (
+              <div className="stat">
+                <small>DEPARTURE</small>
+                <strong>{time(departureTime)}</strong>
+                <em>
+                  {departure?.actual ? "Actual" :
+                    departure?.estimated ? "Estimated" :
+                    departure?.delay != null ? `${departure.delay} min delay` : "Scheduled"}
+                </em>
+              </div>
+            )}
+            {arrivalTime && (
+              <div className="stat">
+                <small>ARRIVAL</small>
+                <strong>{time(arrivalTime)}</strong>
+                <em>
+                  {arrival?.actual ? "Actual" :
+                    arrival?.estimated ? "Estimated" :
+                    arrival?.delay != null ? `${arrival.delay} min delay` : "Scheduled"}
+                </em>
+              </div>
+            )}
+            {isLive && live.altitude != null && (
+              <div className="stat">
+                <small>ALTITUDE</small>
+                <strong>{num(live.altitude, " ft")}</strong>
+              </div>
+            )}
+            {isLive && live.speed_horizontal != null && (
+              <div className="stat">
+                <small>SPEED</small>
+                <strong>{num(live.speed_horizontal, " km/h")}</strong>
+              </div>
+            )}
           </section>
 
-          <section className="card details">
-            <h2>Flight details</h2>
-            <div className="detailsgrid">
-              <div><small>AIRLINE</small><strong>{flight?.airline?.name || "—"}</strong></div>
-              <div><small>AIRCRAFT</small><strong>{flight?.aircraft?.iata || flight?.aircraft?.icao || "—"}</strong></div>
-              <div><small>REGISTRATION</small><strong>{flight?.aircraft?.registration || "—"}</strong></div>
-              <div><small>DEPARTURE GATE</small><strong>{departure?.gate || "—"}</strong></div>
-              <div><small>DEPARTURE TERMINAL</small><strong>{departure?.terminal || "—"}</strong></div>
-              <div><small>ARRIVAL GATE</small><strong>{arrival?.gate || "—"}</strong></div>
-              <div><small>ARRIVAL TERMINAL</small><strong>{arrival?.terminal || "—"}</strong></div>
-              <div><small>STATUS</small><strong>{statusText}</strong></div>
-            </div>
-          </section>
+          {(flight?.airline?.name || flight?.aircraft?.iata || flight?.aircraft?.icao ||
+            flight?.aircraft?.registration || departure?.gate || departure?.terminal ||
+            arrival?.gate || arrival?.terminal) && (
+            <section className="card details">
+              <h2>Flight details</h2>
+              <div className="detailsgrid">
+                {flight?.airline?.name && <div><small>AIRLINE</small><strong>{flight.airline.name}</strong></div>}
+                {(flight?.aircraft?.iata || flight?.aircraft?.icao) && <div><small>AIRCRAFT</small><strong>{flight.aircraft.iata || flight.aircraft.icao}</strong></div>}
+                {flight?.aircraft?.registration && <div><small>REGISTRATION</small><strong>{flight.aircraft.registration}</strong></div>}
+                {departure?.gate && <div><small>DEPARTURE GATE</small><strong>{departure.gate}</strong></div>}
+                {departure?.terminal && <div><small>DEPARTURE TERMINAL</small><strong>{departure.terminal}</strong></div>}
+                {arrival?.gate && <div><small>ARRIVAL GATE</small><strong>{arrival.gate}</strong></div>}
+                {arrival?.terminal && <div><small>ARRIVAL TERMINAL</small><strong>{arrival.terminal}</strong></div>}
+              </div>
+            </section>
+          )}
 
           <div className="actions">
             <button onClick={() => refresh()} disabled={loading}>
@@ -212,7 +223,7 @@ export default function Flightline() {
       )}
 
       {err && <div className="error">{err}</div>}
-      <footer>Live data via Aviationstack · Server-side API proxy · Last update {last || "—"}</footer>
+      <footer>Live data via Aviationstack · Server-side API proxy{last ? ` · Last update ${last}` : ""}</footer>
     </main>
   );
 }
