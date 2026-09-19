@@ -58,7 +58,6 @@ function simulatePosition(departure:any, arrival:any, now=Date.now()) {
   const end=toTimestamp(endValue, arrival?.timezone);
   if (!start || !end || end <= start) return null;
 
-  const now=Date.now();
   if (now < start || now > end) return null;
 
   const progress=Math.max(0,Math.min(1,(now-start)/(end-start)));
