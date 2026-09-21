@@ -25,10 +25,10 @@ async function resolveTimezones(depIata:string|null,arrIata:string|null,depTimez
   return result;
 }
 
-function instant(value:any,ts:any){
+function instant(utcValue:any,ts:any){
   if(ts!=null&&Number.isFinite(Number(ts)))return new Date(Number(ts)*1000).toISOString();
-  if(value==null)return null;
-  const s=String(value).trim();
+  if(utcValue==null)return null;
+  const s=String(utcValue).trim();
   return s?s.replace(" ","T")+"Z":null;
 }
 
@@ -57,17 +57,17 @@ export async function GET(request: Request) {
       departure:{
         iata:f.dep_iata||null,icao:f.dep_icao||null,airport:f.dep_name||f.dep_airport||null,
         terminal:f.dep_terminal||null,gate:f.dep_gate||null,
-        scheduled:instant(f.dep_time_utc||f.dep_time,f.dep_time_ts),
-        estimated:instant(f.dep_estimated_utc||f.dep_estimated,f.dep_estimated_ts),
-        actual:instant(f.dep_actual_utc||f.dep_actual,f.dep_actual_ts),
+        scheduled:instant(f.dep_time_utc,f.dep_time_ts),
+        estimated:instant(f.dep_estimated_utc,f.dep_estimated_ts),
+        actual:instant(f.dep_actual_utc,f.dep_actual_ts),
         delay:f.dep_delayed??null,timezone:timezones.departure
       },
       arrival:{
         iata:f.arr_iata||null,icao:f.arr_icao||null,airport:f.arr_name||f.arr_airport||null,
         terminal:f.arr_terminal||null,gate:f.arr_gate||null,
-        scheduled:instant(f.arr_time_utc||f.arr_time,f.arr_time_ts),
-        estimated:instant(f.arr_estimated_utc||f.arr_estimated,f.arr_estimated_ts),
-        actual:instant(f.arr_actual_utc||f.arr_actual,f.arr_actual_ts),
+        scheduled:instant(f.arr_time_utc,f.arr_time_ts),
+        estimated:instant(f.arr_estimated_utc,f.arr_estimated_ts),
+        actual:instant(f.arr_actual_utc,f.arr_actual_ts),
         delay:f.arr_delayed??null,timezone:timezones.arrival
       },
       live:{latitude:f.lat??null,longitude:f.lng??null,altitude:f.alt??null,speed_horizontal:f.speed??null,direction:f.dir??null,vertical_speed:f.v_speed??null,updated:f.updated??null,hex:f.hex??null},
