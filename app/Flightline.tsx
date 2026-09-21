@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useState} from "react";
 import dynamic from "next/dynamic";
 const RouteMap=dynamic(()=>import("./RouteMap"),{ssr:false,loading:()=> <div className="map loading">Loading live map…</div>});
-const toDate=(v:any)=>{if(!v)return null;const s=String(v);if(/^\d{4}-\d{2}-\d{2}T/.test(s))return new Date(s.endsWith("Z")||/[+-]\d{2}:?\d{2}$/.test(s)?s:s+"Z");const d=new Date(s);return Number.isNaN(d.getTime())?null:d};
+const toDate=(v:any)=>{if(!v)return null;const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}[ T]/.test(s)){const iso=s.replace(" ","T");const normalized=iso.endsWith("Z")||/[+-]\d{2}:?\d{2}$/.test(iso)?iso:iso+"Z";const d=new Date(normalized);return Number.isNaN(d.getTime())?null:d}const d=new Date(s);return Number.isNaN(d.getTime())?null:d};
 const time=(v:any,tz?:string)=>{const d=toDate(v);if(!d)return null;return new Intl.DateTimeFormat("en-GB",{timeZone:tz||"UTC",hour:"2-digit",minute:"2-digit",hour12:false}).format(d)};
 const date=(v:any,tz?:string)=>{const d=toDate(v);if(!d)return "";return new Intl.DateTimeFormat("en-GB",{timeZone:tz||"UTC",day:"numeric",month:"short"}).format(d)};
 const num=(v:any,s="")=>v==null?null:Math.round(Number(v)).toLocaleString()+s;
